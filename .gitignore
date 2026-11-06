@@ -1,0 +1,34 @@
+# Flutter & Dart
+.dart_tool/
+.packages
+build/
+coverage/
+
+# Android
+android/**/gradlew
+android/**/gradlew.bat
+android/**/local.properties
+android/**/GeneratedPluginRegistrant.java
+android/.gradle/
+**/build/
+
+# iOS
+ios/**/Pods/
+ios/**/.symlinks/
+ios/**/Flutter/Flutter.framework
+ios/**/Flutter/Flutter.podspec
+ios/**/GeneratedPluginRegistrant.h
+ios/**/GeneratedPluginRegistrant.m
+ios/**/.flutter-plugins
+ios/**/.flutter-plugins-dependencies
+
+# Windows
+windows/flutter/ephemeral/
+windows/CMakeLists.txt.user
+
+# IDE & OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db

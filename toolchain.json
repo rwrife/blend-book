@@ -1,0 +1,10 @@
+{
+  "platform": "windows+android+ios+flutter",
+  "framework": "Flutter stable",
+  "status": "PLANNED - SDK versions to be measured and pinned in skeleton issue",
+  "bundle_identifier": "com.infinityball.blendbook",
+  "android_application_id": "com.infinityball.blendbook",
+  "ios_bundle_identifier": "com.infinityball.blendbook",
+  "ios_tablet_support": true,
+  "windows_primary_release": true
+}
