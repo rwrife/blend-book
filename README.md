@@ -25,11 +25,11 @@ Identifier for Android applicationId and iOS bundle ID: `com.infinityball.blendb
 
 ## Status and milestones
 
-Documentation scaffold only: no Flutter app, icon, CI or build exists yet. See [PLAN.md](PLAN.md) and issue backlog. `AppStore/description.txt` is planned-feature copy, not a claim of shipped behavior. Generate `AppStore/icon.png` through `spark-media image` (OpenAI Images API) once skeleton exists, inspect artwork, and wire Windows/Android/iOS icon sets; never use placeholder icons.
+Flutter 3.47.7 starter app has Windows, Android, and iOS project files, native shells, and CI. Storage, scaling, exports, and release packaging remain open issues. See [PLAN.md](PLAN.md) and issue backlog. `AppStore/description.txt` is planned-feature copy, not a claim of shipped behavior. Generate `AppStore/icon.png` through `spark-media image` (OpenAI Images API) once skeleton exists, inspect artwork, and wire Windows/Android/iOS icon sets; never use placeholder icons.
 
 ## Development quickstart (after skeleton issue)
 
-Install pinned Flutter stable version recorded in `toolchain.json`. Run `flutter pub get`, `flutter test`, `flutter run -d windows` on Windows or use Android/iOS devices where supported. Linux checks should run in pinned Flutter Docker image. No build command can run against current docs-only scaffold.
+Install pinned Flutter stable version recorded in `toolchain.json` (Flutter 3.47.7, Dart 3.13.5). Run `flutter pub get --enforce-lockfile`, `flutter analyze`, `flutter test`, and `flutter run -d windows` on Windows; Android and iOS projects support device builds. CI runs a Windows release build and pinned Docker Linux tests plus Android debug build. iOS compilation requires macOS/Xcode and has not yet been verified.
 
 Release milestone: `.github/workflows/release.yml`, triggered on `v*` tag or manual dispatch, builds Windows release on `windows-latest`, zips portable build, attaches it to GitHub release. Android/Play and iOS/TestFlight are later milestones.
 

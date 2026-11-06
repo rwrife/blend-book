@@ -5,8 +5,6 @@ build/
 coverage/
 
 # Android
-android/**/gradlew
-android/**/gradlew.bat
 android/**/local.properties
 android/**/GeneratedPluginRegistrant.java
 android/.gradle/

@@ -1,0 +1,50 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.7'
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - run: dart format --output=none --set-exit-if-changed lib test
+      - run: flutter analyze
+      - run: flutter test
+      - run: flutter build windows --release
+      - name: Verify Windows executable
+        shell: pwsh
+        run: |
+          $exe = 'build/windows/x64/runner/Release/blend_book.exe'
+          if (!(Test-Path $exe) -or (Get-Item $exe).Length -eq 0) { throw "Missing $exe" }
+          Write-Host "Windows executable: $exe"
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pinned Docker Flutter tests and Android debug build
+        run: |
+          docker run --name blend-book-ci --entrypoint /bin/bash \
+            -v "$PWD:/work" -w /work -e HOME=/tmp \
+            gmeligio/flutter-android:3.47.7 -c '
+              set -euo pipefail
+              export PATH=/home/flutter/sdks/flutter/bin:$PATH
+              git config --global --add safe.directory /work
+              flutter --version
+              flutter pub get --enforce-lockfile
+              dart format --output=none --set-exit-if-changed lib test
+              flutter analyze
+              flutter test --reporter expanded
+              flutter build apk --debug
+              test -s build/app/outputs/flutter-apk/app-debug.apk
+            '
