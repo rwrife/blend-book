@@ -3,20 +3,30 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
-void main() => runApp(const BlendBookApp());
+import 'blend_screen.dart';
+import 'blend_store.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final store = await BlendStore.openOnDevice();
+  runApp(BlendBookApp(store: store));
+}
 
 class BlendBookApp extends StatelessWidget {
-  const BlendBookApp({super.key});
+  const BlendBookApp({super.key, this.store});
+  final BlendStore? store;
 
   @override
   Widget build(BuildContext context) {
-    const home = AdaptiveScaffold(
-      title: 'Blend Book',
-      body: Center(child: Text('Your blends stay on this device.')),
-    );
+    final home = store == null
+        ? const AdaptiveScaffold(
+            title: 'Blend Book',
+            body: Center(child: Text('Your blends stay on this device.')),
+          )
+        : BlendScreen(store: store!);
     return switch (defaultTargetPlatform) {
-      TargetPlatform.iOS => const CupertinoApp(title: 'Blend Book', home: home),
-      TargetPlatform.windows => const fluent.FluentApp(
+      TargetPlatform.iOS => CupertinoApp(title: 'Blend Book', home: home),
+      TargetPlatform.windows => fluent.FluentApp(
         title: 'Blend Book',
         home: home,
       ),
