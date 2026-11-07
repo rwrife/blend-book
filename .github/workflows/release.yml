@@ -1,0 +1,91 @@
+name: Windows portable release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing v* tag to publish (must point to checked-out commit)'
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          persist-credentials: false
+      - name: Check release tag
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') { throw "Expected vMAJOR.MINOR.PATCH tag" }
+          git fetch --no-tags origin "refs/tags/$env:RELEASE_TAG`:refs/tags/$env:RELEASE_TAG"
+          if ($LASTEXITCODE -ne 0) { throw "Release tag missing" }
+          $tagSha = git rev-list -n 1 "refs/tags/$env:RELEASE_TAG"
+          $headSha = git rev-parse HEAD
+          if ($tagSha -ne $headSha) { throw "Tag does not match checkout" }
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') {
+            git fetch --no-tags origin "refs/heads/main:refs/remotes/origin/main"
+            if ($LASTEXITCODE -ne 0) { throw "Cannot verify release branch" }
+            git merge-base --is-ancestor $headSha origin/main
+            if ($LASTEXITCODE -ne 0) { throw "Manual releases require tag on main" }
+          }
+          Write-Host "Release $env:RELEASE_TAG from $headSha"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.7'
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - run: dart format --output=none --set-exit-if-changed lib test
+      - run: flutter analyze
+      - run: flutter test
+      - run: flutter build windows --release
+      - name: Smoke-test and zip portable Windows app
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          $release = 'build/windows/x64/runner/Release'
+          $exe = Join-Path $release 'blend_book.exe'
+          if (!(Test-Path $exe) -or (Get-Item $exe).Length -eq 0) { throw "Missing Windows executable" }
+          if (!(Test-Path (Join-Path $release 'data/flutter_assets'))) { throw "Missing Flutter assets" }
+          if (!(Test-Path (Join-Path $release 'flutter_windows.dll'))) { throw "Missing Flutter runtime" }
+          $app = Start-Process -FilePath (Resolve-Path $exe) -PassThru
+          Start-Sleep -Seconds 5
+          $app.Refresh()
+          if ($app.HasExited) { throw "Windows app exited during smoke test with code $($app.ExitCode)" }
+          Stop-Process -Id $app.Id
+          $zip = "blend-book-$env:RELEASE_TAG-windows-x64.zip"
+          Compress-Archive -Path "$release/*" -DestinationPath $zip -CompressionLevel Optimal
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $zip))
+          try {
+            $entries = @($archive.Entries | ForEach-Object FullName)
+            foreach ($required in @('blend_book.exe', 'flutter_windows.dll')) {
+              if ($entries -notcontains $required) { throw "Missing $required in release zip" }
+            }
+            if (!($entries | Where-Object { $_ -like 'data/flutter_assets/*' })) { throw "Missing Flutter assets in zip" }
+            Write-Host "Verified $zip ($((Get-Item $zip).Length) bytes, $($entries.Count) entries)"
+          } finally { $archive.Dispose() }
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          $zip = "blend-book-$env:RELEASE_TAG-windows-x64.zip"
+          gh release view $env:RELEASE_TAG *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $env:RELEASE_TAG --verify-tag --title "Blend Book $env:RELEASE_TAG" --notes "Portable Windows x64 build. Unzip and run blend_book.exe. Blends stay local; no account or network required." $zip
+          } else {
+            gh release upload $env:RELEASE_TAG $zip --clobber
+          }
+          if ($LASTEXITCODE -ne 0) { throw "GitHub release publish failed" }
+          gh release view $env:RELEASE_TAG --json assets,url --jq '{url,assets:[.assets[]|{name,size,url}]}'
+          if ($LASTEXITCODE -ne 0) { throw "GitHub release verification failed" }
