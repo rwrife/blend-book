@@ -133,6 +133,82 @@ void main() {
     },
   );
 
+  test(
+    'export and restore roundtrip retains revisions and prior backup',
+    () async {
+      final first = await store.create('Rub', [paprika]);
+      await store.revise(first.id, [paprika, cumin]);
+      final exported = store.exportBytes();
+      await store.create('Second', [cumin]);
+      final beforeRestore = await store.file.readAsBytes();
+      await store.restore(exported);
+      expect(store.blends, hasLength(1));
+      expect(store.blends.single.revisions, hasLength(2));
+      expect(
+        await File('${store.file.path}.restore-backup').readAsBytes(),
+        beforeRestore,
+      );
+      final reopened = BlendStore.onDevice(directory);
+      await reopened.load();
+      expect(reopened.blends.single.id, first.id);
+      await store.rollbackRestore();
+      expect(await store.file.readAsBytes(), beforeRestore);
+      expect(store.blends, hasLength(2));
+      expect(await File('${store.file.path}.restore-backup').exists(), isFalse);
+    },
+  );
+
+  test('restore on empty store can be undone', () async {
+    final source = BlendStore.onDevice(Directory('${directory.path}/source'));
+    await source.load();
+    final blend = await source.create('Other', [paprika]);
+    await store.restore(source.exportBytes());
+    expect(store.blends.single.id, blend.id);
+    expect(store.canUndoRestore, isTrue);
+    await store.rollbackRestore();
+    expect(store.blends, isEmpty);
+    expect(store.canUndoRestore, isFalse);
+  });
+
+  test('restore failure leaves live store unchanged', () async {
+    final first = await store.create('Rub', [paprika]);
+    final prior = await store.file.readAsBytes();
+    await expectLater(
+      store.restore(utf8.encode('{corrupted json')),
+      throwsFormatException,
+    );
+    expect(await store.file.readAsBytes(), prior);
+    expect(store.blends.single.id, first.id);
+  });
+
+  test('rollback throws state error when no restore has occurred', () async {
+    await expectLater(store.rollbackRestore(), throwsStateError);
+  });
+
+  test(
+    'malformed and oversized restore leave disk and memory unchanged',
+    () async {
+      final first = await store.create('Rub', [paprika]);
+      final prior = await store.file.readAsBytes();
+      await expectLater(
+        store.restore(utf8.encode('{bad')),
+        throwsFormatException,
+      );
+      await expectLater(
+        store.restore(List.filled(10 * 1024 * 1024 + 1, 32)),
+        throwsFormatException,
+      );
+      final duplicate = jsonDecode(utf8.decode(prior)) as Map<String, dynamic>;
+      duplicate['blends'] = [duplicate['blends'][0], duplicate['blends'][0]];
+      await expectLater(
+        store.restore(utf8.encode(jsonEncode(duplicate))),
+        throwsFormatException,
+      );
+      expect(await store.file.readAsBytes(), prior);
+      expect(store.blends.single.id, first.id);
+    },
+  );
+
   test('bad schema and references never replace live state', () async {
     final prior = await store.create('Rub', [paprika]);
     final data =

@@ -1,5 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+
+import 'portable_files.dart';
+import 'restore_confirmation.dart';
+
 import 'package:flutter/material.dart' as material;
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
@@ -71,7 +75,63 @@ class _BlendScreenState extends State<BlendScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.all(8),
-            child: AdaptiveButton(label: 'New blend', onPressed: () => _edit()),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                AdaptiveButton(label: 'New blend', onPressed: () => _edit()),
+                AdaptiveButton(
+                  label: 'Export backup',
+                  onPressed: () async {
+                    try {
+                      await saveOwnedFile(
+                        context,
+                        'blend-book-backup.json',
+                        'application/json',
+                        Uint8List.fromList(widget.store.exportBytes()),
+                      );
+                    } catch (e) {
+                      if (mounted) setState(() => error = e.toString());
+                    }
+                  },
+                ),
+                if (widget.store.canUndoRestore)
+                  AdaptiveButton(
+                    label: 'Undo restore',
+                    onPressed: () async {
+                      try {
+                        await widget.store.rollbackRestore();
+                        if (mounted) {
+                          setState(() {
+                            error = null;
+                            selectedId = null;
+                          });
+                        }
+                      } catch (e) {
+                        if (mounted) setState(() => error = e.toString());
+                      }
+                    },
+                  ),
+                AdaptiveButton(
+                  label: 'Restore backup',
+                  onPressed: () async {
+                    final confirmed = await showRestoreConfirmation(context);
+                    if (confirmed != true || !mounted) return;
+                    try {
+                      await restoreOwnedFile(widget.store);
+                      if (mounted) {
+                        setState(() {
+                          error = null;
+                          selectedId = null;
+                        });
+                      }
+                    } catch (e) {
+                      if (mounted) setState(() => error = e.toString());
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
           if (error != null) Text(error!, key: const Key('blend-error')),
           Expanded(
@@ -176,6 +236,24 @@ class _DetailState extends State<_Detail> {
                   if (mounted) {
                     setState(() => error = null);
                     widget.onChanged();
+                  }
+                } catch (e) {
+                  if (mounted) setState(() => error = e.toString());
+                }
+              },
+            ),
+            AdaptiveButton(
+              label: 'Export jar card',
+              onPressed: () async {
+                try {
+                  final bytes = await jarCard(blend, revision, DateTime.now());
+                  if (context.mounted) {
+                    await saveOwnedFile(
+                      context,
+                      'blend-book-jar-card.pdf',
+                      'application/pdf',
+                      bytes,
+                    );
                   }
                 } catch (e) {
                   if (mounted) setState(() => error = e.toString());
