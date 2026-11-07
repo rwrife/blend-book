@@ -153,6 +153,8 @@ class BlendStore {
   final File file;
   List<Blend> _blends = [];
   bool _writing = false;
+  bool _undoRestoreAvailable = false;
+  bool get canUndoRestore => _undoRestoreAvailable;
   List<Blend> get blends => List.unmodifiable(_blends);
 
   factory BlendStore.onDevice(Directory directory) =>
@@ -172,7 +174,11 @@ class BlendStore {
       _blends = [];
       return;
     }
-    final bytes = await file.readAsBytes();
+    _blends = _parse(await file.readAsBytes());
+    _undoRestoreAvailable = await File('${file.path}.restore-backup').exists();
+  }
+
+  static List<Blend> _parse(List<int> bytes) {
     if (bytes.length > 10 * 1024 * 1024) {
       throw const FormatException('Store too large');
     }
@@ -195,7 +201,53 @@ class BlendStore {
     if (entries.map((b) => b.id).toSet().length != entries.length) {
       throw const FormatException('Duplicate blend ID');
     }
-    _blends = entries;
+    return entries;
+  }
+
+  List<int> exportBytes() => utf8.encode(
+    jsonEncode({
+      'schemaVersion': 2,
+      'blends': _blends.map((b) => b.toJson()).toList(),
+    }),
+  );
+
+  Future<void> restore(List<int> bytes) async {
+    if (_writing) throw StateError('Write already in progress');
+    _writing = true;
+    try {
+      final next = _parse(bytes);
+      final restoreBackup = File('${file.path}.restore-backup');
+      if (await file.exists()) {
+        await file.copy(restoreBackup.path);
+      } else {
+        await file.parent.create(recursive: true);
+        await restoreBackup.writeAsBytes(exportBytes(), flush: true);
+      }
+      await _save(next);
+      _undoRestoreAvailable = true;
+    } finally {
+      _writing = false;
+    }
+  }
+
+  Future<void> rollbackRestore() async {
+    if (_writing) throw StateError('Write already in progress');
+    _writing = true;
+    try {
+      final restoreBackup = File('${file.path}.restore-backup');
+      if (!_undoRestoreAvailable || !await restoreBackup.exists()) {
+        throw StateError('No previous snapshot to rollback');
+      }
+      final previousBytes = await restoreBackup.readAsBytes();
+      final prior = _parse(previousBytes);
+      await _save(prior);
+      _undoRestoreAvailable = false;
+      if (await restoreBackup.exists()) {
+        await restoreBackup.delete();
+      }
+    } finally {
+      _writing = false;
+    }
   }
 
   Future<Blend> create(
