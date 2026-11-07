@@ -25,7 +25,7 @@ Identifier for Android applicationId and iOS bundle ID: `com.infinityball.blendb
 
 ## Status and milestones
 
-Flutter 3.47.7 starter app has Windows, Android, and iOS project files, native shells, and CI. Storage, scaling, exports, and release packaging remain open issues. See [PLAN.md](PLAN.md) and issue backlog. `AppStore/description.txt` is planned-feature copy, not a claim of shipped behavior. Generate `AppStore/icon.png` through `spark-media image` (OpenAI Images API) once skeleton exists, inspect artwork, and wire Windows/Android/iOS icon sets; never use placeholder icons.
+Flutter 3.47.7 app has Windows, Android, and iOS project files, native shells, offline blend revision storage, scaling worksheet, printable PDF jar card, JSON backup/restore, and CI. Release packaging remains open. See [PLAN.md](PLAN.md) and issue backlog. `AppStore/description.txt` reflects implemented features. App icon is generated artwork through `spark-media image` (OpenAI Images API), wired into Windows, Android and iOS icons; see `AppStore/icon-source.md`.
 
 ## Development quickstart (after skeleton issue)
 
